@@ -101,6 +101,10 @@ def load_image_into_numpy_array(image):
 
 
 def person_counter(classes):
+  """
+  Take output of the NN and counts how many persons are
+  in the image
+  """
   person_counter = 0
   for index, value in enumerate(classes[0]):
       object_dict = {}
@@ -109,7 +113,6 @@ def person_counter(classes):
           person_counter += 1
   return "Persons: " + str(person_counter)
 
-# In[10]:
 
 with detection_graph.as_default():
   with tf.Session(graph=detection_graph) as sess:
@@ -140,7 +143,7 @@ with detection_graph.as_default():
           use_normalized_coordinates=True,
           line_thickness=8)
 
-      # Adding person counter to the image
+      # Adding person counter to the image 
       str_person_counter = person_counter(classes)
       font =cv2.FONT_HERSHEY_SIMPLEX
       cv2.putText(image_np, str_person_counter, (10, 30), font, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
