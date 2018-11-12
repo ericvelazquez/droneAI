@@ -118,7 +118,7 @@ def set_up_drone():
 #If we are using the drone, set it up and use its camera
 if DRONE_ON: 
   ARdrone = set_up_drone()
-  cap = cv2.VideoCapture('tcp://192.168.1.1:5555')            # Connect to drone camera
+  cap = cv2.VideoCapture("tcp://"+ARdrone.DroneIP+":5555")    # Connect to drone camera
 else:
   # Capture video from webcam
   cap = cv2.VideoCapture(0) 
@@ -126,6 +126,9 @@ with detection_graph.as_default():
   with tf.Session(graph=detection_graph) as sess:
     while True:
       ret, image_np = cap.read()
+      if not cap:
+        time.sleep(0.1)   
+        continue
       # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
       image_np_expanded = np.expand_dims(image_np, axis=0)
       image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
@@ -185,8 +188,7 @@ with detection_graph.as_default():
           ARdrone.land()
           cv2.destroyAllWindows()   
           break
-
-      else:
-        if cv2.waitKey(25) & 0xFF == ord('v'):
+          
+      if cv2.waitKey(25) & 0xFF == ord('v'):
           cv2.destroyAllWindows()
           break
