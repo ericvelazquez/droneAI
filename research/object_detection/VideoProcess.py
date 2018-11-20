@@ -10,22 +10,29 @@ class VideoProcess:
     Class that continuously process a frame using a dedicated thread.
     """
 
-    def __init__(self, frame=None, detection_graph=None, category_index = None):
-        self.image_np = frame
+    def __init__(self, detection_graph=None, category_index = None):
         self.detection_graph = detection_graph
         self.category_index = category_index
         self.stopped = False
+        self.image_np = None
+        self.frame = None
 
     def start(self):
         Thread(target=self.process, args=()).start()
         return self
 
+    def update_frame(self, new_frame):
+        self.frame = new_frame
+
     def process(self):
         with self.detection_graph.as_default():
             with tf.Session(graph=self.detection_graph) as sess:
                 while not self.stopped:
+                    if self.frame is None:
+                        self.stop()
+                    frame_process = self.frame
                     # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
-                    image_np_expanded = np.expand_dims(self.image_np, axis=0)
+                    image_np_expanded = np.expand_dims(frame_process, axis=0)
                     image_tensor = self.detection_graph.get_tensor_by_name('image_tensor:0')
                     # Each box represents a part of the image where a particular object was detected.
                     boxes = self.detection_graph.get_tensor_by_name('detection_boxes:0')
@@ -41,13 +48,15 @@ class VideoProcess:
 
                     # Visualization of the results of a detection.
                     vis_util.visualize_boxes_and_labels_on_image_array(
-                        self.image_np,
+                        frame_process,
                         np.squeeze(boxes),
                         np.squeeze(classes).astype(np.int32),
                         np.squeeze(scores),
                         self.category_index,
                         use_normalized_coordinates=True,
                         line_thickness=8)
+
+                    self.image_np = frame_process
 
     def stop(self):
         self.stopped = True

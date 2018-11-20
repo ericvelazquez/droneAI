@@ -1,5 +1,6 @@
 from threading import Thread
 import cv2
+from djitellopy import Tello
 
 class VideoGet:
     """
@@ -7,8 +8,11 @@ class VideoGet:
     with a dedicated thread.
     """
 
-    def __init__(self, src=0):
-        self.stream = cv2.VideoCapture(src)
+    def __init__(self, src=0, ip=-1):
+        if ip != -1:
+            self.stream = cv2.VideoCapture(ip)
+        else:
+            self.stream = cv2.VideoCapture(src)
         (self.grabbed, self.frame) = self.stream.read()
         self.stopped = False
 

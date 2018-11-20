@@ -8,7 +8,6 @@ import argparse
 import cv2
 
 from VideoGet import VideoGet
-from VideoShow import VideoShow
 from VideoProcess import VideoProcess
 
 sys.path.append("..")
@@ -16,19 +15,15 @@ from utils import label_map_util
 
 
 ### Variables
-
 # What model to download.
 MODEL_NAME = 'ssd_mobilenet_v1_coco_11_06_2017'
 MODEL_FILE = MODEL_NAME + '.tar.gz'
 DOWNLOAD_BASE = 'http://download.tensorflow.org/models/object_detection/'
-
 # Path to frozen detection graph. This is the actual model that is used for the object detection.
 PATH_TO_CKPT = MODEL_NAME + '/frozen_inference_graph.pb'
-
 # List of the strings that is used to add correct label for each box.
 PATH_TO_LABELS = os.path.join('data', 'mscoco_label_map.pbtxt')
 NUM_CLASSES = 90
-
 # Using drone bool
 DRONE_ON = False
 
@@ -39,8 +34,13 @@ options = parser.parse_args()
 if options.drone:
     DRONE_ON = True
 
-### Download Model
+### Loading label map
+# Label maps map indices to category names, so that when our convolution network predicts `5`, we know that this corresponds to `airplane`.  Here we use internal utility functions, but anything that returns a dictionary mapping integers to appropriate string labels would be fine
+label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
+categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,                                                            use_display_name=True)
+category_index = label_map_util.create_category_index(categories)
 
+### Download Model
 my_file = Path(MODEL_NAME + "/frozen_inference_graph.pb")
 if my_file.is_file() == False:  # Element not downloaded yet
     opener = urllib.request.URLopener()
@@ -60,31 +60,83 @@ with detection_graph.as_default():
         od_graph_def.ParseFromString(serialized_graph)
         tf.import_graph_def(od_graph_def, name='')
 
-### Loading label map
-# Label maps map indices to category names, so that when our convolution network predicts `5`, we know that this corresponds to `airplane`.  Here we use internal utility functions, but anything that returns a dictionary mapping integers to appropriate string labels would be fine
-label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
-categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
-                                                            use_display_name=True)
-category_index = label_map_util.create_category_index(categories)
+def set_up_drone():
+  """
+  Set ups the AR drone 2.0 and return drone object
+  """
+  drone = ps_drone.Drone()                                    # Start using drone
+  drone.startup()                                             # Connects to drone and starts subprocesses
+  drone.reset()                                               # Sets drone's status to good
+  while (drone.getBattery()[0] == -1):      time.sleep(0.1)   # Waits until drone has done its reset
+  print "Battery: "+str(drone.getBattery()[0])+"%  "+str(drone.getBattery()[1])
+  drone.useDemoMode(True)                                     # Just give me 15 basic dataset per second
+  drone.setConfigAllID()                                      # Go to multiconfiguration-mode
+  drone.setConfig("control:altitude max","1800")
+  drone.sdVideo()                                             # Choose lower resolution
+  drone.frontCam()                                            # Choose front view
+  return drone
+
+class MultiThread:
+
+    def __init__(self, source = 0, ip=-1, parrot=None):
+        self.video_getter = VideoGet(source, ip).start()
+        self.video_processer = VideoProcess(detection_graph=detection_graph, category_index=category_index).start()
+        self.parrot = parrot
+
+    def start(self):
+        should_stop = False
+        while not should_stop:
+            if self.video_getter.stopped or self.video_processer.stopped:
+                # self.video_shower.stop()
+                self.video_processer.stop()
+                self.video_getter.stop()
+                should_stop = True
+
+            self.video_processer.update_frame(self.video_getter.frame)
+
+            if self.video_processer.image_np is not None:
+                cv2.imshow('object detection', cv2.resize(self.video_processer.image_np, (800, 600)))
+                cv2.waitKey(1)
+
+            if DRONE_ON and self.parrot:
+                if cv2.waitKey(1) & 0xFF == ord('t'):
+                    self.parrot.takeoff()
+                elif cv2.waitKey(1) & 0xFF == ord('l'):
+                    self.parrot.land()
+                elif cv2.waitKey(1) & 0xFF == ord('h'):
+                    self.parrot.hover()
+                elif cv2.waitKey(1) & 0xFF == ord('w'):
+                    self.parrot.moveForward()
+                elif cv2.waitKey(1) & 0xFF == ord('s'):
+                    self.parrot.moveBackward()
+                elif cv2.waitKey(1) & 0xFF == ord('a'):
+                    self.parrot.moveLeft()
+                elif cv2.waitKey(1) & 0xFF == ord('d'):
+                    self.parrot.moveRight()
+                elif cv2.waitKey(1) & 0xFF == ord('q'):
+                    self.parrot.turnLeft()
+                elif cv2.waitKey(1) & 0xFF == ord('e'):
+                    self.parrot.turnRight()
+                elif cv2.waitKey(1) & 0xFF == ord('z'):
+                    self.parrot.stop
+                elif cv2.waitKey(1) & 0xFF == ord('0'):
+                    self.parrot.stop()
+                    self.parrot.land()
+                    self.video_processer.stop()
+                    self.video_getter.stop()
+                    should_stop = True
 
 
-def multithread(source = 0):
 
-    video_getter = VideoGet(source).start()
-    video_processer = VideoProcess(frame=video_getter.frame, detection_graph=detection_graph, category_index = category_index).start()
-    #video_shower = VideoShow(video_getter.frame).start()
-    while True:
-        if video_getter.stopped or video_processer.stopped:
-            video_shower.stop()
-            #video_processer.stop()
-            video_getter.stop()
-            break
-        video_processer.image_np = video_getter.frame
-        cv2.imshow('object detection', cv2.resize(video_processer.image_np, (800, 600)))
-        cv2.waitKey(1)
-        #video_shower.frame = frame
+def main():
+    ip = -1
+    parrot = None
+    if DRONE_ON:
+        parrot = set_up_drone()
+        ip = "tcp://" + parrot.DroneIP + ":5555" # Connect to drone camera
 
+    MultiThread(0,ip,parrot).start()
+    cv2.destroyAllWindows()
 
-
-
-multithread(0)
+if __name__ == '__main__':
+    main()
