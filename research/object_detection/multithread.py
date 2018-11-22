@@ -77,6 +77,10 @@ def set_up_drone():
   return drone
 
 class MultiThread:
+    """
+    This class jpins both VideoGet and VideoProcess classes and also initialize
+    and controls the AR Parrot
+    """
 
     def __init__(self, source = 0, ip=-1, parrot=None):
         self.video_getter = VideoGet(source, ip).start()
@@ -95,36 +99,40 @@ class MultiThread:
             self.video_processer.update_frame(self.video_getter.frame)
 
             if self.video_processer.image_np is not None:
+                str_person_counter = self.video_processer.persons
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                cv2.putText(self.video_processer.image_np, str_person_counter, (10, 30), font, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
                 cv2.imshow('object detection', cv2.resize(self.video_processer.image_np, (800, 600)))
-                cv2.waitKey(1)
+                c = cv2.waitKey(1)
+                if c & 0xFF == ord('0'):
+                        self.video_processer.stop()
+                        self.video_getter.stop()
+                        if self.parrot:
+                            self.parrot.stop()
+                            self.parrot.land()
+                        should_stop = True
 
             if DRONE_ON and self.parrot:
-                if cv2.waitKey(1) & 0xFF == ord('t'):
+                if c & 0xFF == ord('t'):
                     self.parrot.takeoff()
-                elif cv2.waitKey(1) & 0xFF == ord('l'):
+                elif c & 0xFF == ord('l'):
                     self.parrot.land()
-                elif cv2.waitKey(1) & 0xFF == ord('h'):
+                elif c & 0xFF == ord('h'):
                     self.parrot.hover()
-                elif cv2.waitKey(1) & 0xFF == ord('w'):
+                elif c & 0xFF == ord('w'):
                     self.parrot.moveForward()
-                elif cv2.waitKey(1) & 0xFF == ord('s'):
+                elif c & 0xFF == ord('s'):
                     self.parrot.moveBackward()
-                elif cv2.waitKey(1) & 0xFF == ord('a'):
+                elif c & 0xFF == ord('a'):
                     self.parrot.moveLeft()
-                elif cv2.waitKey(1) & 0xFF == ord('d'):
+                elif c & 0xFF == ord('d'):
                     self.parrot.moveRight()
-                elif cv2.waitKey(1) & 0xFF == ord('q'):
+                elif c & 0xFF == ord('q'):
                     self.parrot.turnLeft()
-                elif cv2.waitKey(1) & 0xFF == ord('e'):
+                elif c & 0xFF == ord('e'):
                     self.parrot.turnRight()
-                elif cv2.waitKey(1) & 0xFF == ord('z'):
-                    self.parrot.stop
-                elif cv2.waitKey(1) & 0xFF == ord('0'):
+                elif c & 0xFF == ord('z'):
                     self.parrot.stop()
-                    self.parrot.land()
-                    self.video_processer.stop()
-                    self.video_getter.stop()
-                    should_stop = True
 
 
 

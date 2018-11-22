@@ -16,6 +16,7 @@ class VideoProcess:
         self.stopped = False
         self.image_np = None
         self.frame = None
+        self.persons = None
 
     def start(self):
         Thread(target=self.process, args=()).start()
@@ -23,6 +24,19 @@ class VideoProcess:
 
     def update_frame(self, new_frame):
         self.frame = new_frame
+
+    def person_counter(self, classes,scores, category_index):
+        """
+        Take output of the NN and counts how many persons are
+        in the image
+        """
+        person_counter = 0
+        for index, value in enumerate(classes[0]):
+            object_dict = {}
+            if scores[0, index] > 0.5:
+                if (category_index.get(value)).get('name').encode('utf8') == 'person':
+                    person_counter += 1
+        return "Persons: " + str(person_counter)
 
     def process(self):
         with self.detection_graph.as_default():
@@ -57,6 +71,7 @@ class VideoProcess:
                         line_thickness=8)
 
                     self.image_np = frame_process
+                    self.persons = self.person_counter(classes, scores, self.category_index)
 
     def stop(self):
         self.stopped = True
