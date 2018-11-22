@@ -32,8 +32,7 @@ class VideoProcess:
         """
         person_counter = 0
         for index, value in enumerate(classes[0]):
-            object_dict = {}
-            if scores[0, index] > 0.5:
+            if scores[0, index] > 0.5: #threshold
                 if (category_index.get(value)).get('name').encode('utf8') == 'person':
                     person_counter += 1
         return "Persons: " + str(person_counter)
