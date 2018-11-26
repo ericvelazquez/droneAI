@@ -6,6 +6,7 @@ import tensorflow as tf
 from pathlib import Path
 import argparse
 import cv2
+import ps_drone
 
 from VideoGet import VideoGet
 from VideoProcess import VideoProcess
@@ -98,12 +99,13 @@ class MultiThread:
 
             self.video_processer.update_frame(self.video_getter.frame)
 
+            c = cv2.waitKey(1)
             if self.video_processer.image_np is not None:
                 str_person_counter = self.video_processer.persons
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 cv2.putText(self.video_processer.image_np, str_person_counter, (10, 30), font, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
                 cv2.imshow('object detection', cv2.resize(self.video_processer.image_np, (800, 600)))
-                c = cv2.waitKey(1)
+
                 if c & 0xFF == ord('0'):
                         self.video_processer.stop()
                         self.video_getter.stop()
